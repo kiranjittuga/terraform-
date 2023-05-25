@@ -38,7 +38,7 @@ workflows:
       - tflint
       - test:
           requires:
-            - tflint 
+            - tflin 
       - integration:
           requires:
             - test
