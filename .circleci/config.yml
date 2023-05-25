@@ -1,9 +1,14 @@
 jobs:
-  build:
+   tflint:
     machine: true
     steps:
       - checkout
-      - run: echo "This is a build step"
+
+      - run: docker run --rm -v $(pwd):/data -t ghcr.io/terraform-linters/tflint aws -f json | tee tflint-output.json
+
+      - store_artifacts:
+          path: tflint-output.json
+          destination: tflint-artifact
 
   test:
     machine: true
@@ -30,10 +35,10 @@ workflows:
   version: 2
   terraform:
     jobs:
-      - build
+      - tflint
       - test:
           requires:
-            - build 
+            - tflint 
       - integration:
           requires:
             - test
