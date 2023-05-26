@@ -1,46 +1,57 @@
-name: Terraform                               # workflow name
-
-on:
-  push:                                       
-    branches:                                 # similar to "only" in GitLab
-      - main
-
 jobs:
-   tflint:
-    runs-on: ubuntu-20.04
+  build:
+    machine: true
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - checkout
+      - run: echo "This is a build step"
 
-      - uses: terraform-linters/setup-tflint@v1
-        name: Setup TFLint
-        with:
-          tflint_version: latest
-
-      - name: Run TFLint
-        run: tflint -f json aws > tflint-output.json
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: TFLint
-          path: tflint-output.json
-        if: always()                        # what is this for?
   test:
-    runs-on: ubuntu-20.04
-    needs: tflint
+    machine: true
     steps:
+      - checkout
       - run: echo "This is a test step"
 
-  integration:
-    runs-on: ubuntu-20.04
-    needs: test
+  checkov:
+    machine: true
     steps:
-      - run: echo "This is an integration step"
-      - run: exit 1
-        continue-on-error: true
+      - checkout
+
+      - run: 
+          command: docker run --rm -w /src -v $(pwd):/src bridgecrew/checkov -d aws -o json | tee checkov-output.json || true
+
+      - store_artifacts:
+          path: checkov-output.json
+          destination: checkov-artifact
+          when: always
+
+  integration:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          command: |
+            echo "This is an integration step"
+            exit 1
+          when: on_fail         # Even if the job fails, continue to the next stages
 
   prod:
-    runs-on: ubuntu-20.04
-    needs: integration
+    machine: true
     steps:
+      - checkout
       - run: echo "This is a deploy step"
+
+workflows:
+  version: 2
+  terraform:
+    jobs:
+      - checkov
+      - test:
+          requires:
+            - checkov
+      - integration:
+          requires:
+            - test
+      - prod:
+          type: approval
+          requires:
+            - integration
