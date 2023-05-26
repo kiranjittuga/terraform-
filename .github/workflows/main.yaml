@@ -1,7 +1,11 @@
+
+name: Terraform                               # workflow name
+
 on:
   push:                                       
     branches:                                 # similar to "only" in GitLab
       - main
+
 jobs:
    terrascan:
     runs-on: ubuntu-20.04
@@ -19,20 +23,21 @@ jobs:
           only_warn: true
           iac_dir: 'aws'
 
-test:
+  test:
     runs-on: ubuntu-20.04
-    needs: terrascan
+    needs:  terrascan
     steps:
       - run: echo "This is a test step"
-      
-integration:
+
+  integration:
     runs-on: ubuntu-20.04
     needs: test
     steps:
       - run: echo "This is an integration step"
       - run: exit 1
         continue-on-error: true
-prod:
+
+  prod:
     runs-on: ubuntu-20.04
     needs: integration
     steps:
