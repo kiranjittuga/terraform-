@@ -1,39 +1,51 @@
-
-name: Terraform                               # workflow name
-
-on:
-  push:                                       
-    branches:                                 # similar to "only" in GitLab
-      - main
-
 jobs:
   tfsec:
-    runs-on: ubuntu-20.04
+    machine: true
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - checkout
 
-      - name: Terraform security scan
-        uses: aquasecurity/tfsec-action@v1.0.0
-        with:
-          soft_fail: true
+      - run:
+          command: docker run --rm -v $(pwd):/src aquasec/tfsec /src -f json | tee tfsec-output.json || true
+
+      - store_artifacts:
+          path: tfsec-output.json
+          destination: tfsec-artifact
+          when: always
 
   test:
-    runs-on: ubuntu-20.04
-    needs: tfsec
+    machine: true
     steps:
+      - checkout
       - run: echo "This is a test step"
 
   integration:
-    runs-on: ubuntu-20.04
-    needs: test
+    machine: true
     steps:
-      - run: echo "This is an integration step"
-      - run: exit 1
-        continue-on-error: true
+      - checkout
+      - run:
+          command: |
+            echo "This is an integration step"
+            exit 1
+          when: on_fail         # Even if the job fails, continue to the next stages
 
   prod:
-    runs-on: ubuntu-20.04
-    needs: integration
+    machine: true
     steps:
+      - checkout
       - run: echo "This is a deploy step"
+
+workflows:
+  version: 2
+  terraform:
+    jobs:
+      - tfsec
+      - test:
+          requires:
+            - tfsec
+      - integration:
+          requires:
+            - test
+      - prod:
+          type: approval
+          requires:
+            - integration
