@@ -1,57 +1,39 @@
+on:
+  push:                                       
+    branches:                                 # similar to "only" in GitLab
+      - main
 jobs:
-  build:
-    machine: true
+   terrascan:
+    runs-on: ubuntu-20.04
     steps:
-      - checkout
-      - run: echo "This is a build step"
+      - name: Checkout
+        uses: actions/checkout@v2
 
-  test:
-    machine: true
+      - name: Run Terrascan
+        id: terrascan
+        uses: accurics/terrascan-action@v1
+        with:
+          iac_type: 'terraform'
+          iac_version: 'v14'
+          policy_type: 'aws'
+          only_warn: true
+          iac_dir: 'aws'
+
+test:
+    runs-on: ubuntu-20.04
+    needs: terrascan
     steps:
-      - checkout
       - run: echo "This is a test step"
-
-  checkov:
-    machine: true
+      
+integration:
+    runs-on: ubuntu-20.04
+    needs: test
     steps:
-      - checkout
-
-      - run: 
-          command: docker run --rm -w /src -v $(pwd):/src bridgecrew/checkov -d aws -o json | tee checkov-output.json || true
-
-      - store_artifacts:
-          path: checkov-output.json
-          destination: checkov-artifact
-          when: always
-
-  integration:
-    machine: true
+      - run: echo "This is an integration step"
+      - run: exit 1
+        continue-on-error: true
+prod:
+    runs-on: ubuntu-20.04
+    needs: integration
     steps:
-      - checkout
-      - run:
-          command: |
-            echo "This is an integration step"
-            exit 1
-          when: on_fail         # Even if the job fails, continue to the next stages
-
-  prod:
-    machine: true
-    steps:
-      - checkout
       - run: echo "This is a deploy step"
-
-workflows:
-  version: 2
-  terraform:
-    jobs:
-      - checkov
-      - test:
-          requires:
-            - checkov
-      - integration:
-          requires:
-            - test
-      - prod:
-          type: approval
-          requires:
-            - integration
